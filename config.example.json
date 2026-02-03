@@ -1,0 +1,16 @@
+{
+    "telegram": {
+        "bot_token": "YOUR_BOT_TOKEN_HERE",
+        "chat_id": "YOUR_CHAT_ID_HERE"
+    },
+    "wallets": [
+        {
+            "address": "0x1234567890abcdef1234567890abcdef12345678",
+            "label": "Whale1"
+        },
+        {
+            "address": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+            "label": "SmartMoney"
+        }
+    ]
+}
