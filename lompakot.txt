@@ -1,0 +1,17 @@
+hype1
+0x082e843a431aef031264dc232693dd710aedca88
+
+hype2
+0x40e7f70d8c5dbf7b27dab33ed826484b3c657e56
+
+hype3
+0xe7ec7fbf4f195fc8e57d814e15c3a2857cb632a3
+
+hype4 ISOLATED
+0xeadc152ac1014ace57c6b353f89adf5faffe9d55
+
+hype5 ISOLATED
+0xd47587702a91731dc1089b5db0932cf820151a91
+
+garretbullish
+0xb317d2bc2d3d2df5fa441b5bae0ab9d8b07283ae
