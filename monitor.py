@@ -161,7 +161,7 @@ class HyperliquidMonitor:
         # Key: "{address}_{coin}_{open/close}", Value: {"count": int, "last_time": int}
         self.fill_series = {}
         self.TWAP_ALERT_LIMIT = 1  # Max alerts before assuming TWAP
-        self.TWAP_RESET_MS = 1 * 60 * 1000  # 1 minute in milliseconds
+        self.TWAP_RESET_MS = 5 * 60 * 1000  # 5 minutes in milliseconds
 
     async def send_alert(self, message: str):
         """Send alert to Telegram"""
