@@ -10,11 +10,13 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import Optional
 
 import aiohttp
 import websockets
-from telegram import Bot
+from telegram import Bot, Update
 from telegram.constants import ParseMode
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Logging setup
 logging.basicConfig(
@@ -35,6 +37,59 @@ PROTOCOL_ADDRESSES = {
     "0xfefefefefefefefefefefefefefefefefefefefe",
     "0x0000000000000000000000000000000000000000",
 }
+
+
+class WalletManager:
+    """Manages reading and writing wallets.json"""
+
+    def __init__(self):
+        self.wallets_path = Path(__file__).parent / "wallets.json"
+        self.data = self._load()
+
+    def _load(self) -> dict:
+        if self.wallets_path.exists():
+            with open(self.wallets_path, 'r') as f:
+                return json.load(f)
+        return {"wallets": []}
+
+    def _save(self):
+        with open(self.wallets_path, 'w') as f:
+            json.dump(self.data, f, indent=4, ensure_ascii=False)
+
+    @property
+    def wallets(self) -> list:
+        return self.data.get('wallets', [])
+
+    def add_wallet(self, address: str, label: str) -> bool:
+        """Add a wallet. Returns False if already exists."""
+        addr_lower = address.lower()
+        for w in self.wallets:
+            if w['address'].lower() == addr_lower:
+                return False
+        self.data.setdefault('wallets', []).append({
+            'address': address,
+            'label': label
+        })
+        self._save()
+        return True
+
+    def remove_wallet(self, identifier: str) -> Optional[dict]:
+        """Remove wallet by address or label. Returns removed wallet or None."""
+        id_lower = identifier.lower()
+        for i, w in enumerate(self.wallets):
+            if w['address'].lower() == id_lower or w['label'].lower() == id_lower:
+                removed = self.wallets.pop(i)
+                self._save()
+                return removed
+        return None
+
+    def find_wallet(self, identifier: str) -> Optional[dict]:
+        """Find wallet by address or label."""
+        id_lower = identifier.lower()
+        for w in self.wallets:
+            if w['address'].lower() == id_lower or w['label'].lower() == id_lower:
+                return w
+        return None
 
 
 def load_config() -> dict:
@@ -134,21 +189,23 @@ https://hypurrscan.io/address/{address}
 
 
 class HyperliquidMonitor:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, wallet_manager: WalletManager):
         self.config = config
+        self.wallet_manager = wallet_manager
         self.bot = Bot(token=config['telegram']['bot_token'])
         self.chat_id = config['telegram']['chat_id']
+        self._ws = None  # Active WebSocket reference
 
         # Create address -> label mapping
         self.wallets = {
             w['address'].lower(): w['label']
-            for w in config['wallets']
+            for w in wallet_manager.wallets
         }
 
         # Create address -> allowed coins mapping (None = all coins allowed)
         self.wallet_coins = {
             w['address'].lower(): [c.upper() for c in w['coins']] if 'coins' in w else None
-            for w in config['wallets']
+            for w in wallet_manager.wallets
         }
 
         # Track processed fills to avoid duplicates
@@ -175,8 +232,32 @@ class HyperliquidMonitor:
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")
 
+    async def add_wallet(self, address: str, label: str) -> bool:
+        """Add wallet to monitoring and subscribe on active WebSocket"""
+        if not self.wallet_manager.add_wallet(address, label):
+            return False
+        addr_lower = address.lower()
+        self.wallets[addr_lower] = label
+        self.wallet_coins[addr_lower] = None
+        if self._ws:
+            await self.subscribe_to_wallet(self._ws, address)
+        return True
+
+    async def remove_wallet(self, identifier: str) -> Optional[dict]:
+        """Remove wallet from monitoring"""
+        removed = self.wallet_manager.remove_wallet(identifier)
+        if removed:
+            addr_lower = removed['address'].lower()
+            self.wallets.pop(addr_lower, None)
+            self.wallet_coins.pop(addr_lower, None)
+        return removed
+
     async def handle_fill(self, fill: dict, address: str):
         """Process a fill event"""
+        # Ignore fills from wallets no longer tracked
+        if address.lower() not in self.wallets:
+            return
+
         # Check coin filter for this wallet
         coin = fill.get('coin', 'UNKNOWN')
         allowed_coins = self.wallet_coins.get(address.lower())
@@ -252,6 +333,7 @@ class HyperliquidMonitor:
                 logger.info(f"Connecting to Hyperliquid WebSocket...")
 
                 async with websockets.connect(WS_URL) as ws:
+                    self._ws = ws
                     logger.info("Connected! Subscribing to wallets...")
 
                     # Subscribe to all wallets
@@ -293,9 +375,11 @@ class HyperliquidMonitor:
                             logger.error(f"Error processing message: {e}")
 
             except websockets.exceptions.ConnectionClosed:
+                self._ws = None
                 logger.warning("WebSocket connection closed. Reconnecting in 5 seconds...")
                 await asyncio.sleep(5)
             except Exception as e:
+                self._ws = None
                 logger.error(f"Connection error: {e}. Reconnecting in 10 seconds...")
                 await asyncio.sleep(10)
 
@@ -543,6 +627,76 @@ https://hypurrscan.io/address/{address}
                 await asyncio.sleep(self.poll_interval)
 
 
+def _check_auth(chat_id: str):
+    """Decorator factory: only allow commands from the configured chat_id."""
+    def decorator(func):
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if str(update.effective_chat.id) != str(chat_id):
+                return  # silently ignore unauthorized users
+            return await func(update, context)
+        return wrapper
+    return decorator
+
+
+def make_handlers(wallet_monitor: HyperliquidMonitor, wallet_manager: WalletManager, chat_id: str):
+    """Create command handler functions bound to the monitor instances."""
+    auth = _check_auth(chat_id)
+
+    @auth
+    async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        wallets = wallet_manager.wallets
+        if not wallets:
+            await update.message.reply_text("Ei seurattavia lompakoita.")
+            return
+        lines = []
+        for i, w in enumerate(wallets, 1):
+            coins_str = f" [{', '.join(w['coins'])}]" if 'coins' in w else ""
+            lines.append(f"{i}. <b>{w['label']}</b>{coins_str}\n<code>{w['address']}</code>")
+        text = "\n\n".join(lines)
+        await update.message.reply_text(f"Seuratut lompakot ({len(wallets)}):\n\n{text}", parse_mode=ParseMode.HTML)
+
+    @auth
+    async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        args = context.args
+        if not args or len(args) < 2:
+            await update.message.reply_text("Käyttö: /add <osoite> <nimi>")
+            return
+        address = args[0]
+        label = " ".join(args[1:])
+
+        if not address.startswith("0x") or len(address) != 42:
+            await update.message.reply_text("Virheellinen osoite. Osoitteen tulee alkaa 0x ja olla 42 merkkiä.")
+            return
+
+        if await wallet_monitor.add_wallet(address, label):
+            await update.message.reply_text(
+                f"Lompakko lisätty seurantaan:\n<b>{label}</b>\n<code>{address}</code>",
+                parse_mode=ParseMode.HTML
+            )
+            logger.info(f"Wallet added via Telegram: {label} ({address})")
+        else:
+            await update.message.reply_text("Tämä lompakko on jo seurannassa.")
+
+    @auth
+    async def cmd_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        args = context.args
+        if not args:
+            await update.message.reply_text("Käyttö: /remove <nimi tai osoite>")
+            return
+        identifier = " ".join(args)
+        removed = await wallet_monitor.remove_wallet(identifier)
+        if removed:
+            await update.message.reply_text(
+                f"Lompakko poistettu:\n<b>{removed['label']}</b>\n<code>{removed['address']}</code>",
+                parse_mode=ParseMode.HTML
+            )
+            logger.info(f"Wallet removed via Telegram: {removed['label']} ({removed['address']})")
+        else:
+            await update.message.reply_text("Lompakkoa ei löytynyt nimellä tai osoitteella.")
+
+    return cmd_list, cmd_add, cmd_remove
+
+
 async def main():
     """Entry point"""
     logger.info("=" * 50)
@@ -551,30 +705,47 @@ async def main():
 
     try:
         config = load_config()
+        wallet_manager = WalletManager()
 
-        tasks = []
+        # Build PTB Application for command handling
+        app = Application.builder().token(config['telegram']['bot_token']).build()
+
+        # Create wallet monitor (always, commands need it)
+        wallet_monitor = HyperliquidMonitor(config, wallet_manager)
+
+        # Register command handlers
+        chat_id = config['telegram']['chat_id']
+        cmd_list, cmd_add, cmd_remove = make_handlers(wallet_monitor, wallet_manager, chat_id)
+        app.add_handler(CommandHandler("list", cmd_list))
+        app.add_handler(CommandHandler("add", cmd_add))
+        app.add_handler(CommandHandler("remove", cmd_remove))
+
+        # Initialize the application (sets up bot, updater, etc.)
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+
+        logger.info("Telegram command handlers registered: /list, /add, /remove")
+
+        monitor_tasks = []
 
         # Start wallet monitor if wallets configured
-        if config.get('wallets'):
-            logger.info(f"Loaded {len(config['wallets'])} wallet(s) from config")
-            wallet_monitor = HyperliquidMonitor(config)
-            tasks.append(wallet_monitor.monitor())
+        if wallet_manager.wallets:
+            logger.info(f"Loaded {len(wallet_manager.wallets)} wallet(s) from wallets.json")
         else:
-            logger.warning("No wallets configured - skipping wallet monitor")
+            logger.warning("No wallets configured yet - use /add to add wallets")
+
+        monitor_tasks.append(wallet_monitor.monitor())
 
         # Start whale monitor if enabled
         if config.get('whale_monitor', {}).get('enabled', True):
             whale_monitor = WhaleMonitor(config)
-            tasks.append(whale_monitor.monitor())
+            monitor_tasks.append(whale_monitor.monitor())
         else:
             logger.info("Whale monitor disabled in config")
 
-        if not tasks:
-            logger.error("No monitors to run!")
-            return
-
         # Run all monitors concurrently
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*monitor_tasks)
 
     except FileNotFoundError:
         logger.error("Please create config.json from config.example.json")
@@ -583,6 +754,13 @@ async def main():
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         raise
+    finally:
+        try:
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

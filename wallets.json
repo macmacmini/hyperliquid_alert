@@ -10,10 +10,6 @@
     },
     "wallets": [
         {
-            "address": "0x1da40C6F1bBaeEAC69f2Fd8a6ecBDeC206B57aA8",
-            "label": "lulllul"
-        },
-        {
             "address": "0xe117d3d94b30F7e7aA4f29704d0d2f43C009b9A8",
             "label": "oma"
         },
@@ -32,12 +28,9 @@
         {
             "address": "0xeadc152ac1014ace57c6b353f89adf5faffe9d55",
             "label": "hype4 ISOLATED",
-            "coins": ["HYPE"]
-        },
-        {
-            "address": "0xd47587702a91731dc1089b5db0932cf820151a91",
-            "label": "hype5 ISOLATED",
-            "coins": ["HYPE"]
+            "coins": [
+                "HYPE"
+            ]
         },
         {
             "address": "0xb317d2bc2d3d2df5fa441b5bae0ab9d8b07283ae",
@@ -46,6 +39,10 @@
         {
             "address": "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
             "label": "loracle"
+        },
+        {
+            "address": "0x1da40C6F1bBaeEAC69f2Fd8a6ecBDeC206B57aA8",
+            "label": "lullul"
         }
     ]
 }
