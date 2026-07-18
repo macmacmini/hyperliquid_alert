@@ -14,25 +14,6 @@
             "label": "oma"
         },
         {
-            "address": "0x082e843a431aef031264dc232693dd710aedca88",
-            "label": "hype1"
-        },
-        {
-            "address": "0x40e7f70d8c5dbf7b27dab33ed826484b3c657e56",
-            "label": "hype2"
-        },
-        {
-            "address": "0xe7ec7fbf4f195fc8e57d814e15c3a2857cb632a3",
-            "label": "hype3"
-        },
-        {
-            "address": "0xeadc152ac1014ace57c6b353f89adf5faffe9d55",
-            "label": "hype4 ISOLATED",
-            "coins": [
-                "HYPE"
-            ]
-        },
-        {
             "address": "0xb317d2bc2d3d2df5fa441b5bae0ab9d8b07283ae",
             "label": "garretbullish"
         },
@@ -43,6 +24,38 @@
         {
             "address": "0x1da40C6F1bBaeEAC69f2Fd8a6ecBDeC206B57aA8",
             "label": "lullul"
+        },
+        {
+            "address": "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b",
+            "label": "CL"
+        },
+        {
+            "address": "0x179f3d11483dafe616d56b32c4ce2562faabbbbb",
+            "label": "techno"
+        },
+        {
+            "address": "0x32008fcb6bbd16532afc83ca8b6c920dde22c407",
+            "label": "zec retard"
+        },
+        {
+            "address": "0x082e843a431aef031264dc232693dd710aedca88",
+            "label": "hype biggest"
+        },
+        {
+            "address": "0x718cc7ee2ae2493ebf7d454316df6b61f4e1a868",
+            "label": "threadguy"
+        },
+        {
+            "address": "0x92ea19eceb7a8de0f50978a1583a5d8b018050e9",
+            "label": "garret2"
+        },
+        {
+            "address": "0xa43dea86853f5ed8f767e36e16fd20b36b07769d",
+            "label": "hakushu"
+        },
+        {
+            "address": "0x77375a8c9d13bf79afb2a87f1b0ac1dfd5f5bf66",
+            "label": "mk4 (10m LIT)"
         }
     ]
 }
