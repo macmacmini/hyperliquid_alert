@@ -1,13 +1,4 @@
 {
-    "whale_monitor": {
-        "enabled": true,
-        "min_hype_balance": 100000,
-        "poll_interval_seconds": 300,
-        "top_holders_limit": 100,
-        "time_window_minutes": 60,
-        "min_hourly_change_hype": 50000,
-        "alert_cooldown_minutes": 30
-    },
     "wallets": [
         {
             "address": "0xe117d3d94b30F7e7aA4f29704d0d2f43C009b9A8",
@@ -20,10 +11,6 @@
         {
             "address": "0x8def9f50456c6c4e37fa5d3d57f108ed23992dae",
             "label": "loracle"
-        },
-        {
-            "address": "0x1da40C6F1bBaeEAC69f2Fd8a6ecBDeC206B57aA8",
-            "label": "lullul"
         },
         {
             "address": "0xcb58b8f5ec6d47985f0728465c25a08ef9ad2c7b",
